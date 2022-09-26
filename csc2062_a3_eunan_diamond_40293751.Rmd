@@ -1,0 +1,295 @@
+---
+title: 'Assignment 3: Machine Learning'
+author: "Eunan Diamond (40293751)"
+output:
+  pdf_document:
+    includes:
+      in_header: preamble.tex
+  html_notebook: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+# Introduction
+The goals of this assignment is to use features developed in assignment 2 to do classification and machine learning using r code and then use my knowledge to interepet the results that my calculations in r code give.
+
+```{r}
+set.seed(42)
+library(rlang)
+library(class)
+library(knitr)
+library("rstudioapi")
+library(MASS)
+library(ggplot2)
+library(caret)
+search()
+setwd(dirname(getActiveDocumentContext()$path))
+getwd()
+```
+# Section 1
+```{r}
+csvF<-read.csv(file ="40293751_features.csv" ,header = TRUE)
+
+  #Add dummy value 1 for letters, so it discriminates between letters and non letters
+  csvF$dummy.letters<-0
+  print(csvF$dummy.letters)
+  csvF[1:80,19]<-1
+  
+  #Shuffle the rows, so the first 80% of the shuffled data could be training data making it random
+  #and last 20% test data
+  features_shuffled<-csvF[sample(nrow(csvF)),]
+  
+  #first 80% will be used as training data, last 20% test data
+  trainingdata=features_shuffled[1:112,]
+  testData=features_shuffled[113:140,]
+ 
+  plt <- ggplot(trainingdata, aes(x=nr_pix, fill=as.factor(dummy.letters))) +
+    geom_histogram(binwidth=.2, alpha=.5, position='identity')
+  plot(plt)
+```
+## Section 1.1
+```{r}
+
+glmFit<-glm(dummy.letters ~ nr_pix+aspect_ratio, 
+              data = trainingdata, 
+              family = 'binomial') 
+  
+  print(summary(glmFit))
+  
+ 
+  
+  dataframematrix <- matrix(nrow=28,ncol=2)
+  dataframematrix[,1] <- testData$nr_pix
+  dataframematrix[,2] <- testData$aspect_ratio
+
+  newdata <-as.data.frame(dataframematrix)
+  colnames(newdata) = c("nr_pix","aspect_ratio")
+  predicted = predict(glmFit,newdata,type="response")
+  print(testData)
+  print(predicted)
+  testData[["predicted_val"]] = predict(glmFit, testData, type="response")
+  testData[["predicted_class"]] = 0
+  testData[["predicted_class"]][testData[["predicted_val"]] > 0.5] = 1
+
+  correct_items = testData[["predicted_class"]] == testData[["dummy.letters"]]
+   correct_items
+  nrow(testData[correct_items,])/nrow(testData)
+  PredictedData <- as.factor(testData[["predicted_class"]])
+  PredictedData
+  ActualData <- as.factor(testData[["dummy.letters"]])
+  ActualData
+  confMatrix <- confusionMatrix(PredictedData,ActualData)
+  confMatrix
+  confMatrix <- confusionMatrix(PredictedData,ActualData,mode = "prec_recall")
+  confMatrix
+ 
+ 
+```
+The code above shows the logistic regression predictions for number of pixels and aspect ratio for classification to check if an image belongs to letter or not. The training data (80% of the total images) was used to train the model using the glm function which fitted the logistic regression model. The predict function then used the test data to check the probability if they are a letter or not. Out of the 28 test data images 14 of them are letters. The table shows which ones were predicted letters or not, if there probability of being a letter based of number of pixels and aspect ratio was greater than 0.5. The correct_items shows which of the test data were predicted correctly. 21 out of 28 were predicted correctly that they were not letter or not. This shows that number of pixels and aspect ratio together are two good features to use to predict if the image is a letter or not. The most confident image of the test data to be an image was the first image with 0.8767535, which was indeed a letter it is a j. The least confident was the 3rd image with it only predicting 0.1273884 for it to be a letter it was as expected not a letter and was a smiley image. To add the logistic regression model tells us that the smaller the aspect ratio the more chance it is a letter with a estimate value of -2.12046, the estimate value, and the same for number pixels, with a negative value also with -0.03493, this tells us the lower the number of black pixels and aspect ratio the bigger chance it is a letter.
+
+To continue, Using this logistic regression model I got the confusion matrix which gave me the the accuracy,true positive rate (sensitivity) and specificity which take 1 away from it can give false positive rate. Also using mode ="prec_recall" on confusion matrix gives precision recall and f1.The accuracy of the model is 0.7143, this shows that this model is mostly reliable, a lot better than chance (50%) but not completely and can be improved on with more features . As the classes are nearly balanced(13 to non letters and 15 to letters) this means accuracy is a good measurement if it is a good model or not. The true positive rate for this model is 0.6154  , this tells us that 61.54% of it correctly predicted that a image which is a letter as a letter. This is a nearly 10% lower than the accuracy, although it is still better than chance, it shows it is not the best at predicting that a image which is a letter is actually a letter . The false positive rate can be calculated by taking  0.8000  (which is the specificity or true negative rate ) away from 1, which gives 1 -  0.8000  = 0.2, this tells us for time that the model predicts that it is not a letter it is wrong 0.2% of the time. This tells us it is more accurate when it predicts for the class that isn't a letter. The confusion matrix also shows that the precision is 0.7273. The precision is the total number of images predicted correctly divided by total number of images predicted as a letter. This can be seen as a more accurate measurement of accuracy in classication as the total number of the two different classes may not be the same, as is the case here (15 to 13).  the precision is just greater than the accuracy and therefore our model may be slightly more reliable than we think. The recall is the of images that are letters that were predicted correctly divided by the total number of images that are letters, here the recall is 0.6154, this tells us that the the for all images that are letters 61.54% of them were predicted correctly, this is same as true positive rate, as it is telling us the same thing. The F1 is the harmonic mean between precision and recall. so basically it combines the recall and precision into one metric. Here the f1 score is 0.6667, this basically tells us there is quite a difference between recall and precision, as the F1 score is over 5% away from precision and over 6% away for recall, this tells us that this may not be the most accuare model and there can be improvements. To add as the test data has 15 letters and 13 non letter images it tells us that F1 score is the the best metric to tell if it is a good classifer or not as accuracy is the best suited when the 2 classes are not equal, therefore 0.6667 tells us that the model is better than chance but there can be improvements to make it a more reliable model.
+
+## Section 1.2
+```{r}
+
+kfoldsk = 5
+  
+
+
+
+ggplot(csvF, aes(x=nr_pix, y=aspect_ratio, color=dummy.letters)) +
+  geom_point(alpha=.5, position='identity')
+
+
+
+
+
+train_control<-trainControl(method="cv",number=kfoldsk,savePredictions = T, classProbs = TRUE)
+csvF$is.letter <- "no"
+csvF$is.letter
+csvF$is.letter[csvF$dummy.letters == 1] <- "yes"
+csvF$is.letter
+
+
+
+model<-train(is.letter~nr_pix+aspect_ratio, data = csvF,trControl=train_control,method="glm",family = "binomial")
+print(model)
+
+model$results
+summary(model)
+mean(model$pred$pred==model$pred$obs)
+
+cm = confusionMatrix(table(model$pred$yes >= 0.5,
+                           model$pred$obs == "yes")) 
+cm
+cm = confusionMatrix(table(model$pred$yes >= 0.5,
+                           model$pred$obs == "yes"),mode = "prec_recall") 
+cm
+```
+In this part I used 5 fold cross validation to do the same analysis as in 1.1. Doing cross validation can make us better understand what's going on as instead of just training 1 model like 1.1 code does this trains 5 models , and then it calculates the model based of all 5, Therefore it is maximizing the amount of data used to train the model, every part of the data is used as testing data once, therefore this more accurately predicts how useful these features are in predicting if it's a letter or not for unseen data. Cross-Validation is a technique used in model selection to better estimate the test error of a predictive model. Therefore it gives us a more true accuracy than using the whole data as training and test data. As expected it gives us different values as the model used for 1.1. It would appear that themodel is over fitted, as the accuracy (0.7071 ) is down from the 0.7143 from the first model. This tells us that data performs better on training data  has declined on 5 fold cv where there is data not seen on training, this is the case here and has been affected by over fitting, the true positive rate however has increased from 0.6154  in the first model to 0.6333, Which does not suit this trend. The false positive rate has increased, as specificity has decreased to 0.7625, telling us that this model is more accurate when predicting that it is not a letter the same as the model, but this has decreased compared to the first model. To add the precision and recall has decreased  and as expected the f1 score has too. The recall has fell the most from 0.7272 to 0.667. a over 5% fall is shows further supports that this model has been overfitted. These results tell us has memorized the training data instead more than learning the relationships between features and the classes (images or not images). Although the falls in accuracies, tpr f1 score etc are not that big (mostly less than 5%) it does show that this model has been slightly overfitted.
+
+## Section 1.3
+```{r}
+
+#1.3
+library(MLeval)
+res <- evalm(model)
+res$roc
+```
+Above there is the ROC curce for the classifier. The roc curve show with the line in the middle what a useless test would be (50% tpr 50% fpr) means it's just by chance therefore not useful. Classifiers that give curves closer to the top-left corner indicate a better performance. This curve shows a somewhat reliable classifier as it is mostly on towards left hand side of the graph but for very small values and big values of tpr and fpr it is towards the line in the middle and even sometimes worse which tells us it is no better than random guessing here. Towards the middle of the graph and for middle values the classifier could be seen as useful and for these values is a lot better than random guessing , this tells us that our classifier could be useful to predict whether an image is a letter or not. This is backed up by the AUC-ROC, as the bigger the area undernath the roc curve the more reliable the classifier in distinguishing between two classifiers, between 0 and 1, here we got 0.77 which tells us that this model, for the most part is very useful as 77% is a high score, the AUC score is very important as it is a good metric to summarise the ROC score and the overall model, therefore in conclusion this is a good model. In 1.1 In the absence of cross-validation, it's possible that the model becomes biased by the data split
+
+# Section 2
+
+## Section 2.1
+```{r}
+set.seed(42)
+csvF<-read.csv(file ="40293751_features.csv" ,header = TRUE)
+#kNeighbourMat<-Matrix(csvF[1:8,3])
+
+kNeighbourMat=csvF[csvF$label %in% c('a','j','sad','smiley','xclaim'),]
+kNeighbourMat$dummy.class[kNeighbourMat$label %in% c('a','j')]<-"letter"
+kNeighbourMat$dummy.class[kNeighbourMat$label=="sad"]<-"sad"
+kNeighbourMat$dummy.class[kNeighbourMat$label=="smiley"]<-"smiley"
+kNeighbourMat$dummy.class[kNeighbourMat$label=="xclaim"]<-"xclaim"
+train.X = cbind(kNeighbourMat$no_neigh_right,kNeighbourMat$aspect_ratio,kNeighbourMat$no_neigh_above,kNeighbourMat$connected_areas)
+
+ks = c(1,3,5,7,9,11,13)
+accuracies = c()
+for (kk in ks){
+ 
+  if (kk / 2 !=0)
+ 
+    {
+    print(kk)
+    knn1=knn(train.X,train.X,kNeighbourMat$dummy.class,k=kk)
+  print(table(knn1,kNeighbourMat$dummy.class))
+  accuracies = cbind(accuracies, mean(knn1==kNeighbourMat$dummy.class))
+  }
+}
+accuracies
+```
+For 2.1 I perform 4 way knn classification, for letter (only a or j), sad, smiley or xclaim using 4 features, which were no_neigh_right,aspect_ratio, no_neigh_above and connected_areas. I chose these features because in assignment 2 these were some of the best features to distinguish between a letter and non letter, and to add these features have similarities between each class e.g. aspect ratio the letters have low values for, while sad is mostly just above 1, xclaim very low values below 0.4 and smiley similar to sad but got more values below 1 and still a lot higher than xclaim and the letters. To distingish between each class, I have set up a dummy.class feature which says in english what class it belongs out of from the 4. I then performed a for loop, taking every number from 1 to 13 and doing if statement to check if it dividing this number by 2 doesn't give 0, if It doesn't it is a odd number and is needed for analysis. I then pass my data frame with the 4 features into knn function for both training and test and the dummy.class field and the value of k. The accuracies of each knn would be number of images (76) divided by total number that are correct classification. Above you can see the knn score for each odd value between 1 and 13, as you can see the bigger the k value the worse the accuracy gets, with 1 being a perfect accuracy, getting each classification right. As the k value increases, the training error also increases, this is increase bias because it has to consider more neighbours therefore, the model becomes more complex, as there is no testing data, when k=1 the training data becomes equal to testing data set, therefore 100% correct , as the model becomes more complex it doesn't do this therefore the accuracies decrease as the k value increases.
+
+## Section 2.2
+```{r}
+
+kfoldsk=5
+kNeighbourMat=kNeighbourMat
+
+kNeighbourMat<-kNeighbourMat[sample(nrow(kNeighbourMat)),]
+kNeighbourMat$folds<- cut(seq(1,nrow(kNeighbourMat)),breaks=kfoldsk,labels=FALSE)
+
+kNeighbourMat<-kNeighbourMat[sample(nrow(kNeighbourMat)),]
+kNeighbourMat$folds <- cut(seq(1,nrow(kNeighbourMat)),breaks=kfoldsk,labels=FALSE)
+train_control <- trainControl(method="cv", number=kfoldsk)
+
+tune_grid <- expand.grid(k = ((1:7)*2) -1)
+
+
+# train the model
+
+model <- train(dummy.class~no_neigh_right+aspect_ratio+no_neigh_above+connected_areas, data=kNeighbourMat, 
+               trControl=train_control, tuneGrid=tune_grid, method="knn")
+# summarize results
+print(model)
+```
+For 2.2 I performed  k-nearest-neighbour classification for all odd values between 1 and 13 using 5 fold cross validation for the 4 classes used in 2.1. This would give a better indication on how this data can be fitted as 5 fold cross validation gives us a better indication on how the data is trained and used on unseen data, unlike in 2.1. As expected the accuaries are different from 2.1 and have all decreased from the knn which used the same data as training and test data. Again the best value of K is 1, with accuracy  0.7091667, there is a similar pattern as seen in 2.1, with the higher the k value the lower the accuracy, this is because as the k value becomes bigger the model becomes too generalized and fails to accurately predict data points in both train and test sets, this is known as underfitting (except from k=13), the lower values have also decreased massively on accuracy because of overfitting, e.g. k=1 had accuracy of 1 for 2.1 but it is 0.7091667, this is because the model is too specific and fails to be to generalize,The model accomplishes a high accuracy on train set but will be a poor predictor on new, previously unseen data points, based off our accuracies this is shown to be true. (rest of analysis at 2.4 with graphs).
+
+## Section 2.3 
+```{r}
+tune_grid<- expand.grid(k = 1)#best value of k
+newModel<-train(dummy.class~no_neigh_right+aspect_ratio+no_neigh_above+connected_areas, data=kNeighbourMat, 
+                trControl=train_control, tuneGrid=tune_grid, method="knn")
+knnPredict<-predict(newModel,newdata=kNeighbourMat)
+ActualData <- as.factor(kNeighbourMat[["dummy.class"]])
+cm=confusionMatrix(knnPredict,ActualData)
+cm
+
+tune_grid<- expand.grid(k = 3)# next best value of k
+newModel<-train(dummy.class~no_neigh_right+aspect_ratio+no_neigh_above+connected_areas, data=kNeighbourMat, 
+                trControl=train_control, tuneGrid=tune_grid, method="knn")
+knnPredict<-predict(newModel,newdata=kNeighbourMat)
+ActualData <- as.factor(kNeighbourMat[["dummy.class"]])
+cm=confusionMatrix(knnPredict,ActualData)
+cm
+```
+For 2.3 I used the best value of k from 2.2 (which was 1.1), trained the model again and then used the confusionMatrix function to calculate its confusion matrix. As it predicted all the images to it's correct classes I will instead use the next best k value which was 3 with 0.6975000. The best class in terms of predictions here was letters with 16 out of 16 predicted correctly. The worst with k=3 was smiley with only 75% of the actual smiley images predicted correctly, the other 5 were predicted as sad faces, which isn't too shocking as there is similarities between both of them. this makes smiley and sad faces the most difficult to discriminate between as of course a smiley and sad face have similar features as only difference is the mouth, meaning that the feautures used for this model are more than likley very similar for both of these images, the predictions for the sad faces also back this up, although 17 out of 20 were predicted correctly, the 3 that weren't were smiley faces, therfore backing up our point that these 2 classes are the hardest to discriminate. 
+```{r}
+#2.4
+x1<-model$results$k
+y1<-model$results$Accuracy
+y2<-accuracies
+
+ks<-c(1,1/3,1/5,1/7,1/9,1/11,1/13)
+plot(ks,y1,type="o",ylim=c(0,1),col="blue",ylab="accuracy rate",xlab="1/k")
+lines(ks,type="o",y2,col="red")
+legend(x = "bottomleft",          
+       legend = c("training set", "cv classification set"),lty = c(1, 1),col=c("red","blue"))
+
+ 
+```
+The graph above shows the comparison  between accuracy rate over training data (from 2.1) and cv classication (from 2.2). It shows that no accuries are bigger for cross validation, but there values better reflect the dataset because there is less bias and is used on unseen data unlike training set.
+
+
+This graph shows what I described in 2.2, that the high k values (ones on the left side of graph are underfitted), as being top left in the graph shows underfitting and lower values overfitted as k values with top right plots in graph show overfitting.
+
+# Section 3
+
+## Section 3.1
+```{r}
+set.seed(42)
+allFeats<-read.delim(file ="all_features.csv" ,header = F)
+
+allFeats <- allFeats[sample(nrow(allFeats)),]
+allFeats$folds <- cut(seq(1,nrow(allFeats)),breaks=kfoldsk,labels=FALSE)
+allFeats$folds
+train_control<-trainControl(method = "cv",number = 5,search = 'grid')
+tune_grid <-expand.grid( .mtry=c(2,4,6,8))
+
+x=25
+results<-matrix(,ncol = 4,byrow = T)
+
+
+
+model<-train(V1 ~V3+V4+V5+V6+V7+V8+V9+V10+V11+V12+V13+V14+V15+V16+V17+V18,data=allFeats,method="rf",trControl=train_control,   tuneGrid=tune_grid,ntree=x)
+print(model)
+results<-rbind(results,model$results$Accuracy)
+
+plot((model),main=paste("random forest for ",x," Trees"),xlab="number of predictors")
+for (i in 1:7)
+{
+  x<-x+50
+  print(x)
+  model<-train(V1 ~V3+V4+V5+V6+V7+V8+V9+V10+V11+V12+V13+V14+V15+V16+V17+V18,data=allFeats,method="rf",trControl=train_control,   tuneGrid=tune_grid,ntree=x)
+  print(model)
+  print(plot((model),main=paste("random forest for ",x," Trees"),xlab="number of predictors"))
+  results<-rbind(results,model$results$Accuracy)
+  
+}
+colnames(results)<-c(2,4,6,8)
+rownames(results)<-c('',25,75,125,175,225,275,325,375)
+print(results)
+```
+For 3.1 I performed random forest classification with 5 fold cv. I first split the allFeautres dataframe into 5 folds, to perform 5 fold cv. I use expand.grid mtry to get number of predictors  {2,4,6,8} and then outside loop train the model with the expand grid for 25, then use a loop to do this for 75 to 375 with 50 iterations for each, I then saved the accuracies of each random forest model onto a dataframe as you can see above. To add I have created a scatter graph for each value of k, this is a good visualization for each value of k as it clear shows which number of predictors are best for each k. The best value of k was 125 when it had 8 predictors with 0.8107692 (8 for =275 is also 0.8107692 but on average k=125 has better accuracies on average). This tells us that clearly 125 is the best value of k to predict what symbol the image is or not. On average between all values of k 25 has the worst accuracies, it also has the lowest accuracies when number of predictors = 2 with 0.7638462. A trend for all values of K is that when the number of predictors is 2, it gives the lowest accuracy, this is because it considers only 2 features meaning it would be harder to differ between letters and non letters with less features considered. And as the number of predictors increases the values tend to increase, this is because the it is easier to tell the difference between images if there is more features considered, however for some nTrees it doesn't, this may be that too many features are considered here and the model becomes overfitted, e.g. 175, number of predictors=6 accuracy is 0.8084615 and when it is 8 accuracy is 0.8069231. To add the best nTrees seem to be in the middle, with them getting, with smaller and larger nTrees having slightly less accruacies, this is probably because too little trees are considered at start, e.g. 25, With a lower number of trees the model is more specific and fails to generalize,therfore this causes overfitting  ,and too many at end e.g 325 and 375, this is because when the nTrees value increases the model becomes too generalized and fails to accurately data points in both the training and test sets.This is under fitting, the values in the middle have the best balance of these, therfore giving them the best accuracies. To conclude nTree=125 and No of predictor=8 is the best value for accuracy and will be used for analysis in 3.2
+ 
+## Section 3.2
+```{r}
+set.seed(42)
+accs<-c()
+for (i in 1:15)
+{
+  tune_grid <-expand.grid( .mtry=8)
+  model<-train(V1 ~V3+V4+V5+V6+V7+V8+V9+V10+V11+V12+V13+V14+V15+V16+V17+V18,data=allFeats,method="rf",trControl=train_control,   tuneGrid=tune_grid,ntree=125)
+  print(model)
+accs<-append(accs,model$results$Accuracy)
+  #accs<-c(accs+model$results$Accuracy)
+}
+print(accs)
+accMean<-mean(accs)
+accSd<-sd(accs)
+accMean
+accSd
+t.test(accs,mu = 1/13, alternative = "two.sided")
+```
+In this section, I reran the best combination of trees and predictors (nTree=125 and No Of predictors=8) 15 times to check if it performs significantly better than chance. I did this by having a for loop for 15 times performing random forest for nTree=125 and No Of predictors=8 and saving the accuracy into a data frame. I then used mean function to get the mean of the 15 accuracies and sd function to get the standard deviation. The mean was 0.7978462 and the standard deviation was 0.007223049. This standard deviation score tells us that the data is clustered around the mean, which tells us that there is not distance between each model fitting, so even though there is an element of randmominess in each model fitting the difference is so slight and therefore this supports that this model performs better than chance. The mean is 0.7978462, which is down from 0.8107692 that this model got for accuracy in the results for 3.1, This tells us that this model performed slightly better than on average due the the randominess of cross validation and random forest. The t-test results will tell us if it performs better than chance or not. In this t-test we check if the accuracies are equal to the probabilty of chance which is 1/13(13 groups), if the p score is > 5% the null hypothesis (they are equal stands), if it is less, the alternative hypothesis is true (they are not equal), here the p value is 2.2e-16, which is a very small value and way less than 5%, therefore the alternative hypothesis is true and they differ a lot, as the p value is very small, to add the t value supports this as, the bigger the t value the bigger difference between the groups, the t value is positive and is 386.56, which is a big score which tells us that this model performs way better than random chance . Therefore it is clear based off mean, standard deviation and t test (p and t score) that this model performs significantly better than chance.
